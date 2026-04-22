@@ -150,7 +150,7 @@ export const bookingsAPI = {
     
     if (bookings && bookings.length > 0) {
         bookings.forEach((b: any) => {
-            const match = b.wayBillNo?.match(new RegExp(`${prefix}(\\d+)`));
+            const match = b.wayBillNo?.match(/(\d+)$/);
             if (match) {
                 const num = parseInt(match[1], 10);
                 if (num > maxNumber) maxNumber = num;
