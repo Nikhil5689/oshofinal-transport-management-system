@@ -336,20 +336,119 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   addPayment: async (paymentData) => {
-    const payment = await paymentsAPI.create(paymentData);
-    set((state) => ({ payments: [payment, ...state.payments] }));
+    try {
+      const payment = await paymentsAPI.create(paymentData);
+      const state = get();
+      const newPayments = [payment, ...state.payments];
+      
+      // Calculate updated booking payment status
+      const booking = state.bookings.find((b) => b.id === paymentData.bookingId);
+      if (booking) {
+        const totalPaid = newPayments
+          .filter((p) => p.bookingId === paymentData.bookingId)
+          .reduce((sum, p) => sum + p.amount, 0);
+        
+        const payStatus: PaymentStatus = 
+          totalPaid >= booking.totalFreight ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+        
+        // Update booking in Supabase
+        await bookingsAPI.update(booking.id, { 
+          amountPaid: totalPaid, 
+          paymentStatus: payStatus 
+        });
+
+        // Update local state
+        set((state) => ({
+          payments: [payment, ...state.payments],
+          bookings: state.bookings.map((b) => 
+            b.id === booking.id ? { ...b, amountPaid: totalPaid, paymentStatus: payStatus } : b
+          )
+        }));
+      } else {
+        set((state) => ({ payments: [payment, ...state.payments] }));
+      }
+    } catch (error) {
+      console.error('Failed to add payment:', error);
+      throw error;
+    }
   },
 
   updatePayment: async (id, paymentData) => {
-    await paymentsAPI.update(id, paymentData);
-    set((state) => ({
-      payments: state.payments.map((p) => (p.id === id ? { ...p, ...paymentData } : p)),
-    }));
+    try {
+      await paymentsAPI.update(id, paymentData);
+      set((state) => {
+        const newPayments = state.payments.map((p) => (p.id === id ? { ...p, ...paymentData } : p));
+        
+        // If amount changed, we might need to update the booking status
+        const payment = newPayments.find(p => p.id === id);
+        if (payment) {
+          const booking = state.bookings.find(b => b.id === payment.bookingId);
+          if (booking) {
+            const totalPaid = newPayments
+              .filter(p => p.bookingId === booking.id)
+              .reduce((sum, p) => sum + p.amount, 0);
+            
+            const payStatus: PaymentStatus = 
+              totalPaid >= booking.totalFreight ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+            
+            // This is complex, so we'll just update Supabase and then sync local
+            bookingsAPI.update(booking.id, { amountPaid: totalPaid, paymentStatus: payStatus });
+            
+            return {
+              payments: newPayments,
+              bookings: state.bookings.map(b => 
+                b.id === booking.id ? { ...b, amountPaid: totalPaid, paymentStatus: payStatus } : b
+              )
+            };
+          }
+        }
+        return { payments: newPayments };
+      });
+    } catch (error) {
+      console.error('Failed to update payment:', error);
+      throw error;
+    }
   },
 
   deletePayment: async (id) => {
-    await paymentsAPI.delete(id);
-    set((state) => ({ payments: state.payments.filter((p) => p.id !== id) }));
+    try {
+      const state = get();
+      const paymentToDelete = state.payments.find(p => p.id === id);
+      
+      await paymentsAPI.delete(id);
+      
+      if (paymentToDelete) {
+        const newPayments = state.payments.filter(p => p.id !== id);
+        const booking = state.bookings.find(b => b.id === paymentToDelete.bookingId);
+        
+        if (booking) {
+          const totalPaid = newPayments
+            .filter(p => p.bookingId === booking.id)
+            .reduce((sum, p) => sum + p.amount, 0);
+          
+          const payStatus: PaymentStatus = 
+            totalPaid >= booking.totalFreight ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+          
+          // Update booking in Supabase
+          await bookingsAPI.update(booking.id, { 
+            amountPaid: totalPaid, 
+            paymentStatus: payStatus 
+          });
+
+          set({
+            payments: newPayments,
+            bookings: state.bookings.map(b => 
+              b.id === booking.id ? { ...b, amountPaid: totalPaid, paymentStatus: payStatus } : b
+            )
+          });
+        } else {
+          set({ payments: newPayments });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete payment:', error);
+      throw error;
+    }
   },
 
   // Settings

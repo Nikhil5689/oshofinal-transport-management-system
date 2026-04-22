@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import toast from 'react-hot-toast';
 
 const defaultSettings = {
   id: 'default',
@@ -117,35 +118,54 @@ export const bookingsAPI = {
   },
 
   create: async (booking: any) => {
-    if (booking.invoiceNo) {
-      const { data: existing } = await supabase.from('bookings').select('id').eq('invoiceNo', booking.invoiceNo).maybeSingle();
-      if (existing) {
-        throw new Error(`Invoice number ${booking.invoiceNo} already exists!`);
+    try {
+      if (booking.invoiceNo) {
+        const { data: existing } = await supabase.from('bookings').select('id').eq('invoiceNo', booking.invoiceNo).maybeSingle();
+        if (existing) {
+          throw new Error(`Invoice number ${booking.invoiceNo} already exists!`);
+        }
       }
+      const wayBillNo = await bookingsAPI.getNextWayBillNo();
+      const bookingData = { 
+        ...booking, 
+        id: `booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, 
+        wayBillNo, 
+        createdAt: new Date().toISOString() 
+      };
+      
+      const { data, error } = await supabase.from('bookings').insert([bookingData]).select().single();
+      
+      if (error) {
+        console.error('Supabase Insert Error:', error);
+        toast.error(`Database Error: ${error.message}`);
+        throw error;
+      }
+      return data;
+    } catch (err: any) {
+      console.error('Booking Creation Failed:', err);
+      toast.error(err.message || 'Failed to save booking');
+      throw err;
     }
-    const wayBillNo = await bookingsAPI.getNextWayBillNo();
-    const bookingData = { ...booking, id: `booking_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, wayBillNo, createdAt: new Date().toISOString() };
-    const { data, error } = await supabase.from('bookings').insert([bookingData]).select().single();
-    if (error) {
-        console.error('Error creating booking:', error);
-        return bookingData;
-    }
-    return data || bookingData;
   },
 
   update: async (id: string, booking: any) => {
-    if (booking.invoiceNo) {
-      const { data: existing } = await supabase.from('bookings').select('id').eq('invoiceNo', booking.invoiceNo).maybeSingle();
-      if (existing && existing.id !== id) {
-        throw new Error(`Invoice number ${booking.invoiceNo} already exists!`);
+    try {
+      if (booking.invoiceNo) {
+        const { data: existing } = await supabase.from('bookings').select('id').eq('invoiceNo', booking.invoiceNo).maybeSingle();
+        if (existing && existing.id !== id) {
+          throw new Error(`Invoice number ${booking.invoiceNo} already exists!`);
+        }
       }
+      const { data, error } = await supabase.from('bookings').update(booking).eq('id', id).select().single();
+      if (error) {
+        toast.error(`Update Error: ${error.message}`);
+        throw error;
+      }
+      return data;
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update booking');
+      throw err;
     }
-    const { data, error } = await supabase.from('bookings').update(booking).eq('id', id).select().single();
-    if (error) {
-        console.error('Error updating booking:', error);
-        return booking;
-    }
-    return data || booking;
   },
 
   delete: async (id: string) => {
@@ -197,13 +217,22 @@ export const paymentsAPI = {
   },
 
   create: async (payment: any) => {
-    const paymentData = { ...payment, id: `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, createdAt: new Date().toISOString() };
-    const { data, error } = await supabase.from('payments').insert([paymentData]).select().single();
-    if (error) {
-        console.error('Error creating payment:', error);
-        return paymentData;
+    try {
+      const paymentData = { 
+        ...payment, 
+        id: `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, 
+        createdAt: new Date().toISOString() 
+      };
+      const { data, error } = await supabase.from('payments').insert([paymentData]).select().single();
+      if (error) {
+        toast.error(`Payment Error: ${error.message}`);
+        throw error;
+      }
+      return data;
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save payment');
+      throw err;
     }
-    return data || paymentData;
   },
 
   update: async (id: string, payment: any) => {
