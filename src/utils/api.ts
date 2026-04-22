@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
 const defaultSettings = {
+  id: 'default',
   name: 'OSHO Transport Chhattisgarh',
   address: 'Transport Nagar, Raipur',
   city: 'Raipur',
@@ -225,22 +226,7 @@ export const paymentsAPI = {
 };
 
 // Settings API
-const defaultSettings = {
-  id: 'default',
-  name: 'OSHO Transport Chhattisgarh',
-  address: 'Transport Nagar, Raipur',
-  city: 'Raipur',
-  state: 'Chhattisgarh',
-  phone: '9876543210',
-  phone2: '9876543211',
-  gst: '22AAAAA0000A1Z5',
-  prefix: 'OSHO-',
-  startingNumber: 1001,
-  defaultFreight: 0,
-  defaultHamali: 0,
-  defaultDocket: 50,
-  terms: 'Goods once booked will not be returned. Company not responsible for leakage or breakage. All disputes subject to Raipur jurisdiction.',
-};
+
 
 export const settingsAPI = {
   get: async () => {
