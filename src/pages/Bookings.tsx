@@ -696,7 +696,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Way Bill No', 'Date', 'Route', 'Consignor', 'Consignee', 'Material', 'Freight', 'Status', 'Payment', 'Actions'].map((h) => (
+                {['Way Bill / Inv', 'Date', 'Route', 'Consignor', 'Consignee', 'Material', 'Freight', 'Status', 'Payment', 'Actions'].map((h) => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -714,7 +714,8 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
                   <tr key={b.id} className="hover:bg-blue-50/30 transition-colors">
                     <td className="px-4 py-3">
                       <button onClick={() => { setViewId(b.id); setView('detail'); }}
-                        className="font-bold text-blue-700 hover:text-blue-800">{b.wayBillNo}</button>
+                        className="font-bold text-blue-700 hover:text-blue-800 block">{b.wayBillNo}</button>
+                      <span className="text-[10px] text-gray-400 font-medium">{b.invoiceNo}</span>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{format(parseISO(b.bookingDate), 'dd/MM/yyyy')}</td>
                     <td className="px-4 py-3 text-xs whitespace-nowrap">

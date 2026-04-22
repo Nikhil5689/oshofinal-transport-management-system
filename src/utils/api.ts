@@ -1,5 +1,21 @@
 import { supabase } from './supabase';
 
+const defaultSettings = {
+  name: 'OSHO Transport Chhattisgarh',
+  address: 'Transport Nagar, Raipur',
+  city: 'Raipur',
+  state: 'Chhattisgarh',
+  phone: '9876543210',
+  phone2: '9876543211',
+  gst: '22AAAAA0000A1Z5',
+  prefix: 'OSHO-',
+  startingNumber: 1001,
+  defaultFreight: 0,
+  defaultHamali: 0,
+  defaultDocket: 50,
+  terms: 'Goods once booked will not be returned. Company not responsible for leakage or breakage. All disputes subject to Raipur jurisdiction.',
+};
+
 let authUser: { id: string; username: string } | null = null;
 
 // Load token and user from localStorage on app init
@@ -141,23 +157,30 @@ export const bookingsAPI = {
   },
 
   getNextWayBillNo: async () => {
-    const { data: settingsData } = await supabase.from('settings').select('*').single();
-    const prefix = settingsData?.prefix || 'OSHO-';
-    const startingNumber = settingsData?.startingNumber || 1001;
-    
-    const { data: bookings } = await supabase.from('bookings').select('wayBillNo');
-    let maxNumber = startingNumber - 1;
-    
-    if (bookings && bookings.length > 0) {
-        bookings.forEach((b: any) => {
-            const match = b.wayBillNo?.match(/(\d+)$/);
-            if (match) {
-                const num = parseInt(match[1], 10);
-                if (num > maxNumber) maxNumber = num;
-            }
-        });
+    try {
+        const { data: settingsData } = await supabase.from('settings').select('*').single();
+        const prefix = settingsData?.prefix || defaultSettings.prefix;
+        const startingNumber = settingsData?.startingNumber || defaultSettings.startingNumber;
+        
+        const { data: bookings, error } = await supabase.from('bookings').select('wayBillNo');
+        if (error) throw error;
+
+        let maxNumber = startingNumber - 1;
+        
+        if (bookings && bookings.length > 0) {
+            bookings.forEach((b: any) => {
+                const match = b.wayBillNo?.match(/(\d+)$/);
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    if (!isNaN(num) && num > maxNumber) maxNumber = num;
+                }
+            });
+        }
+        return `${prefix}${maxNumber + 1}`;
+    } catch (err) {
+        console.error('Error in getNextWayBillNo:', err);
+        return `OSHO-${Date.now()}`; // Fallback to unique string if all else fails
     }
-    return `${prefix}${maxNumber + 1}`;
   },
 };
 

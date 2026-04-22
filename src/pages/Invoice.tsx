@@ -291,7 +291,7 @@ function InvoiceList({ onNavigate, onSelectBooking }: { onNavigate: (p: string, 
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              {['Way Bill No', 'Date', 'Consignor', 'Consignee', 'Route', 'Freight', 'Paid', 'Balance', 'Payment Status', 'Action'].map((h) => (
+              {['Way Bill / Invoice', 'Date', 'Consignor', 'Consignee', 'Route', 'Freight', 'Paid', 'Balance', 'Payment Status', 'Action'].map((h) => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -310,7 +310,8 @@ function InvoiceList({ onNavigate, onSelectBooking }: { onNavigate: (p: string, 
                 return (
                   <tr key={b.id} className="hover:bg-blue-50/30 transition-colors">
                     <td className="px-4 py-3">
-                      <span className="font-bold text-blue-700">{b.wayBillNo}</span>
+                      <div className="font-bold text-blue-700">{b.wayBillNo}</div>
+                      <div className="text-[10px] text-gray-400 font-medium">{b.invoiceNo || 'No Invoice'}</div>
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                       {format(parseISO(b.bookingDate), 'dd/MM/yyyy')}
