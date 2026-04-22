@@ -163,6 +163,15 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const result = await authAPI.login(username, password);
+      
+      // Fetch initial data after login
+      await Promise.all([
+        get().fetchClients(),
+        get().fetchBookings(),
+        get().fetchPayments(),
+        get().fetchSettings(),
+      ]);
+
       set({
         isAuthenticated: true,
         currentUser: result.user.username,
@@ -197,6 +206,15 @@ export const useStore = create<AppState>((set, get) => ({
 
     try {
       set({ isLoading: true });
+      
+      // Fetch data using stored token
+      await Promise.all([
+        get().fetchClients(),
+        get().fetchBookings(),
+        get().fetchPayments(),
+        get().fetchSettings(),
+      ]);
+
       const user = authAPI.getUser();
       set({ isAuthenticated: true, currentUser: user?.username ?? null, isLoading: false });
       return true;
@@ -258,7 +276,24 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   getNextWayBillNo: async () => {
-    return await bookingsAPI.getNextWayBillNo();
+    const { bookings, settings } = get();
+    const prefix = settings?.prefix || 'OSHO-';
+    const startingNumber = settings?.startingNumber || 1001;
+    
+    let maxNumber = startingNumber - 1;
+    
+    bookings.forEach((b) => {
+      if (b.wayBillNo) {
+        // Just extract the number at the end of the wayBillNo, ignoring prefix
+        const match = b.wayBillNo.match(/(\d+)$/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNumber) maxNumber = num;
+        }
+      }
+    });
+    
+    return `${prefix}${maxNumber + 1}`;
   },
 
   getNextInvoiceNo: async () => {
