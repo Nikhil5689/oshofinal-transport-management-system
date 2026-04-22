@@ -27,7 +27,7 @@ function LRCopy({ booking, settings, copyLabel }: { booking: Booking; settings: 
     return convert(Math.floor(num)) + ' Rupees Only';
   };
 
-  const payModeLabel = booking.paymentMode === 'toPay' ? 'TO PAY' : booking.paymentMode === 'paid' ? 'PAID' : 'TO BE BILLED';
+  const payModeLabel = booking.paymentMode === 'toPay' ? 'TO PAY' : booking.paymentMode === 'paid' ? 'PAID' : 'TO BE PAID BY SENDER';
 
   return (
     <div style={{
@@ -455,16 +455,46 @@ export default function Invoice({ onNavigate, initialParams }: InvoiceProps) {
     win.document.write(`<!DOCTYPE html>
 <html>
 <head>
-  <title>Way Bill - ${selectedBooking?.wayBillNo}</title>
+  <title>Invoice - ${selectedBooking?.wayBillNo}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; background: #fff; }
-    @page { size: A4 portrait; margin: 8mm; }
-    .lr-copy { page-break-inside: avoid; }
-    .divider { border-top: 2px dashed #666; margin: 4px 0; }
+    body { font-family: Arial, sans-serif; background: #fff; margin: 0; padding: 0; }
+    @page { size: A4 portrait; margin: 0; }
+    .print-container {
+      height: 297mm;
+      width: 210mm;
+      padding: 8mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .lr-copy { 
+      height: 32%; 
+      overflow: hidden;
+      page-break-inside: avoid; 
+    }
+    .divider { 
+      height: 1.5%; 
+      border-top: 1px dashed #999; 
+      text-align: center; 
+      font-size: 8px; 
+      color: #999; 
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cut-text {
+      background: #fff;
+      padding: 0 10px;
+      margin-top: -10px;
+    }
   </style>
 </head>
-<body>${printContents}</body>
+<body>
+  <div class="print-container">
+    ${printContents}
+  </div>
+</body>
 </html>`);
     win.document.close();
     win.focus();
@@ -507,21 +537,21 @@ export default function Invoice({ onNavigate, initialParams }: InvoiceProps) {
         <div className="bg-gray-100 rounded-xl p-2">
           <p className="text-xs text-gray-500 text-center mb-2">📄 A4 Print Preview — 3 Identical Copies</p>
 
-          {/* Print Area */}
-          <div ref={printRef} style={{ backgroundColor: '#fff', padding: '8px' }}>
+          {/* Print Area Preview */}
+          <div ref={printRef} style={{ backgroundColor: '#fff', padding: '0', display: 'flex', flexDirection: 'column', height: '100%', gap: '10px' }}>
             {/* Copy 1 */}
             <div className="lr-copy">
               <LRCopy booking={selectedBooking} settings={settings} copyLabel="CONSIGNOR COPY" />
             </div>
-            <div className="divider" style={{ borderTop: '2px dashed #999', margin: '6px 0', textAlign: 'center', fontSize: '8px', color: '#999', position: 'relative' }}>
-              <span style={{ backgroundColor: '#f3f4f6', padding: '0 6px', position: 'relative', top: '-7px' }}>✂ CUT HERE</span>
+            <div className="divider">
+              <span className="cut-text">✂ CUT HERE</span>
             </div>
             {/* Copy 2 */}
             <div className="lr-copy">
               <LRCopy booking={selectedBooking} settings={settings} copyLabel="CONSIGNEE COPY" />
             </div>
-            <div className="divider" style={{ borderTop: '2px dashed #999', margin: '6px 0', textAlign: 'center', fontSize: '8px', color: '#999', position: 'relative' }}>
-              <span style={{ backgroundColor: '#f3f4f6', padding: '0 6px', position: 'relative', top: '-7px' }}>✂ CUT HERE</span>
+            <div className="divider">
+              <span className="cut-text">✂ CUT HERE</span>
             </div>
             {/* Copy 3 */}
             <div className="lr-copy">

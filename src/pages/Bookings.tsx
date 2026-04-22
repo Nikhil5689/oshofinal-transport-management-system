@@ -47,7 +47,7 @@ const emptyForm = {
 };
 
 export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
-  const { bookings, clients, addBooking, updateBooking, deleteBooking, addClient } = useStore();
+  const { bookings, clients, addBooking, updateBooking, deleteBooking, addClient, getNextInvoiceNo } = useStore();
   const [view, setView] = useState<'list' | 'form' | 'detail'>('list');
   const [editId, setEditId] = useState<string | null>(null);
   const [viewId, setViewId] = useState<string | null>(null);
@@ -70,8 +70,9 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
     }
   }, [initialParams]);
 
-  const openNewForm = () => {
-    setForm({ ...emptyForm, bookingDate: format(new Date(), 'yyyy-MM-dd'), invoiceDate: format(new Date(), 'yyyy-MM-dd') });
+  const openNewForm = async () => {
+    const invoiceNo = await getNextInvoiceNo();
+    setForm({ ...emptyForm, invoiceNo, bookingDate: format(new Date(), 'yyyy-MM-dd'), invoiceDate: format(new Date(), 'yyyy-MM-dd') });
     setEditId(null);
     setConsignorSearch('');
     setConsigneeSearch('');
@@ -140,47 +141,53 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
     return Object.keys(errs).length === 0;
   };
 
-  const handleSave = (andGenerate = false) => {
+  const handleSave = async (andGenerate = false) => {
     if (!validateForm()) { toast.error('Please fill all required fields'); return; }
 
-    // Auto-save consignor if not existing
-    let consignorId = form.consignorId;
-    if (!consignorId && form.consignorName) {
-      const existing = clients.find((c) => c.name.toLowerCase() === form.consignorName.toLowerCase());
-      if (existing) { consignorId = existing.id; }
-      else {
-        const nc = addClient({ name: form.consignorName, phone: form.consignorPhone, address: form.consignorAddress, gst: form.consignorGst, city: form.origin });
-        consignorId = nc.id;
+    try {
+      // Auto-save consignor if not existing
+      let consignorId = form.consignorId;
+      if (!consignorId && form.consignorName) {
+        const existing = clients.find((c) => c.name.toLowerCase() === form.consignorName.toLowerCase());
+        if (existing) {
+          consignorId = existing.id;
+        } else {
+          const nc = await addClient({ name: form.consignorName, phone: form.consignorPhone, address: form.consignorAddress, gst: form.consignorGst, city: form.origin });
+          consignorId = nc.id;
+        }
       }
-    }
-    let consigneeId = form.consigneeId;
-    if (!consigneeId && form.consigneeName) {
-      const existing = clients.find((c) => c.name.toLowerCase() === form.consigneeName.toLowerCase());
-      if (existing) { consigneeId = existing.id; }
-      else {
-        const nc = addClient({ name: form.consigneeName, phone: form.consigneePhone, address: form.consigneeAddress, gst: form.consigneeGst, city: form.destination });
-        consigneeId = nc.id;
+      let consigneeId = form.consigneeId;
+      if (!consigneeId && form.consigneeName) {
+        const existing = clients.find((c) => c.name.toLowerCase() === form.consigneeName.toLowerCase());
+        if (existing) {
+          consigneeId = existing.id;
+        } else {
+          const nc = await addClient({ name: form.consigneeName, phone: form.consigneePhone, address: form.consigneeAddress, gst: form.consigneeGst, city: form.destination });
+          consigneeId = nc.id;
+        }
       }
-    }
 
-    const bookingData = { ...form, consignorId, consigneeId };
+      const bookingData = { ...form, consignorId, consigneeId };
 
-    if (editId) {
-      updateBooking(editId, bookingData);
-      toast.success('Booking updated successfully!');
-      if (andGenerate) {
-        onNavigate('invoice', { bookingId: editId });
+      if (editId) {
+        await updateBooking(editId, bookingData);
+        toast.success('Booking updated successfully!');
+        if (andGenerate) {
+          onNavigate('invoice', { bookingId: editId });
+        } else {
+          setView('list');
+        }
       } else {
-        setView('list');
+        const newBooking = await addBooking(bookingData);
+        toast.success(`Docket ${newBooking.wayBillNo} saved successfully!`);
+        if (andGenerate) {
+          onNavigate('invoice', { bookingId: newBooking.id });
+        } else {
+          setView('list');
+        }
       }
-    } else {
-      const newBooking = addBooking(bookingData);
-      toast.success(`Docket ${newBooking.wayBillNo} saved successfully!`);
-      if (andGenerate) {
-        onNavigate('invoice', { bookingId: newBooking.id });
-      } else {
-        setView('list');
-      }
+    } catch (error: any) {
+      toast.error(error.message || 'An error occurred while saving the booking.');
     }
   };
 
@@ -375,7 +382,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
           {/* Section 1: Auto Data */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Auto Data</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-500 font-medium">Way Bill No</label>
                 <div className="mt-1 text-sm font-bold text-blue-700 bg-blue-50 px-3 py-2.5 rounded-xl">
@@ -394,7 +401,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
           {/* Section 2: Route */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Route</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-500 font-medium">From (Origin) *</label>
                 <input value={form.origin} onChange={(e) => setForm((p) => ({ ...p, origin: e.target.value }))}
@@ -437,7 +444,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 font-medium">Phone</label>
                   <input value={form.consignorPhone} onChange={(e) => setForm((p) => ({ ...p, consignorPhone: e.target.value }))}
@@ -485,7 +492,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 font-medium">Phone</label>
                   <input value={form.consigneePhone} onChange={(e) => setForm((p) => ({ ...p, consigneePhone: e.target.value }))}
@@ -519,7 +526,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
                   className={`mt-1 w-full text-sm border rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.material ? 'border-red-400' : 'border-gray-200'}`} />
                 {errors.material && <p className="text-xs text-red-500 mt-1">{errors.material}</p>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 font-medium">Packages</label>
                   <input type="number" value={form.packages} min={1}
@@ -536,7 +543,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-gray-500 font-medium">Actual Weight (kg)</label>
                   <input type="number" value={form.actualWeight} min={0}
@@ -556,7 +563,7 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
           {/* Section 6: Invoice Details */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h2 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Invoice Details</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-500 font-medium">Invoice Number</label>
                 <input value={form.invoiceNo} onChange={(e) => setForm((p) => ({ ...p, invoiceNo: e.target.value }))}
@@ -579,9 +586,9 @@ export default function Bookings({ onNavigate, initialParams }: BookingsProps) {
                 <label className="text-xs text-gray-500 font-medium">Payment Mode</label>
                 <select value={form.paymentMode} onChange={(e) => setForm((p) => ({ ...p, paymentMode: e.target.value as any }))}
                   className="mt-1 w-full text-sm border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                  <option value="toPay">To Pay</option>
+                  <option value="toPay">To Pay (Receiver will pay)</option>
                   <option value="paid">Paid</option>
-                  <option value="tBB">To Be Billed</option>
+                  <option value="tBB">To Be Paid by Sender</option>
                 </select>
               </div>
             </div>

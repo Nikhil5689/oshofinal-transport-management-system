@@ -1,0 +1,147 @@
+# .htaccess Configuration for Hostinger Deployment
+# Transport Management System - Production Ready
+
+# ============================================================================
+# SECURITY HEADERS
+# ============================================================================
+# Prevent MIME type sniffing
+Header always set X-Content-Type-Options "nosniff"
+
+# Prevent clickjacking (framing the app in iframes)
+Header always set X-Frame-Options "SAMEORIGIN"
+
+# Enable XSS Protection in older browsers
+Header always set X-XSS-Protection "1; mode=block"
+
+# Content Security Policy (CSP) - Adjust origins as needed
+Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'self';"
+
+# HTTP Strict Transport Security (HSTS) - Forces HTTPS for 1 year
+Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+# Referrer Policy
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+# Permissions Policy (Feature Policy)
+Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+
+# ============================================================================
+# GZIP COMPRESSION
+# ============================================================================
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE font/opentype
+    AddOutputFilterByType DEFLATE application/font-woff
+    AddOutputFilterByType DEFLATE application/font-woff2
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# ============================================================================
+# CACHING RULES
+# ============================================================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Default: 1 day
+    ExpiresDefault "access plus 1 day"
+    
+    # HTML files: no-cache (always check with server)
+    ExpiresByType text/html "access plus 0 seconds"
+    
+    # CSS and JavaScript: 1 year (they're versioned in Vite builds)
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    
+    # Images: 1 month
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/gif "access plus 1 month"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+    ExpiresByType image/x-icon "access plus 1 month"
+    
+    # Fonts: 1 year
+    ExpiresByType font/opentype "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    ExpiresByType application/vnd.ms-fontobject "access plus 1 year"
+    ExpiresByType font/ttf "access plus 1 year"
+    
+    # JSON: 0 seconds (always fresh)
+    ExpiresByType application/json "access plus 0 seconds"
+</IfModule>
+
+# ============================================================================
+# URL REWRITING FOR SPA ROUTING
+# ============================================================================
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Remove .html extension from URLs (optional, if desired)
+    # RewriteCond %{REQUEST_FILENAME} !-f
+    # RewriteCond %{REQUEST_FILENAME} !-d
+    # RewriteRule ^([^\.]+)$ $1.html [NC,L]
+    
+    # Redirect HTTP to HTTPS
+    RewriteCond %{HTTPS} off
+    RewriteCond %{HTTP:X-Forwarded-Proto} !https
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+    
+    # Remove trailing slashes (optional)
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.+)/$ /$1 [L,R=301]
+    
+    # API Routes: Proxy to Node.js backend (if running separately on port 5000)
+    # IMPORTANT: Uncomment and configure this ONLY if running a separate Node.js process
+    # ProxyPreserveHost On
+    # ProxyPass /api http://localhost:5000/api
+    # ProxyPassReverse /api http://localhost:5000/api
+    
+    # SPA Routing: Serve index.html for all non-file, non-directory requests
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [QSA,L]
+</IfModule>
+
+# ============================================================================
+# DISABLE DIRECTORY LISTING
+# ============================================================================
+Options -Indexes
+
+# ============================================================================
+# PROTECT SENSITIVE FILES
+# ============================================================================
+<FilesMatch "^\.env">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+<FilesMatch "^(\.git|\.gitignore|node_modules|server\.js|server-data\.json|sessions\.json)">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ============================================================================
+# UTF-8 ENCODING
+# ============================================================================
+AddCharset utf-8 .html .css .js .json .xml
+
+# ============================================================================
+# BROWSER CACHING FOR STATIC ASSETS
+# ============================================================================
+<FilesMatch "\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+</FilesMatch>
+
+# ============================================================================
+# DISABLE CACHING FOR HTML AND JSON
+# ============================================================================
+<FilesMatch "\.(html|json)$">
+    Header set Cache-Control "public, max-age=0, must-revalidate"
+</FilesMatch>

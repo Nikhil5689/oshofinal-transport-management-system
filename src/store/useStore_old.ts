@@ -113,7 +113,6 @@ interface AppState {
   deleteBooking: (id: string) => Promise<void>;
   fetchBookings: () => Promise<void>;
   getNextWayBillNo: () => Promise<string>;
-  getNextInvoiceNo: () => Promise<string>;
 
   // Payments
   addPayment: (payment: Omit<Payment, 'id' | 'createdAt'>) => Promise<void>;
@@ -163,11 +162,21 @@ export const useStore = create<AppState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       const result = await authAPI.login(username, password);
+
+      // Fetch initial data after login
+      await Promise.all([
+        get().fetchClients(),
+        get().fetchBookings(),
+        get().fetchPayments(),
+        get().fetchSettings(),
+      ]);
+
       set({
         isAuthenticated: true,
         currentUser: result.user.username,
         isLoading: false,
       });
+
       return true;
     } catch (error: any) {
       set({ isLoading: false, error: error.message || 'Login failed' });
@@ -197,6 +206,13 @@ export const useStore = create<AppState>((set, get) => ({
 
     try {
       set({ isLoading: true });
+      // Try to fetch data using stored token
+      await Promise.all([
+        get().fetchClients(),
+        get().fetchBookings(),
+        get().fetchPayments(),
+        get().fetchSettings(),
+      ]);
       const user = authAPI.getUser();
       set({ isAuthenticated: true, currentUser: user?.username ?? null, isLoading: false });
       return true;
@@ -208,124 +224,180 @@ export const useStore = create<AppState>((set, get) => ({
 
   // Clients
   fetchClients: async () => {
-    const clients = await clientsAPI.getAll();
-    set({ clients });
+    try {
+      const clients = await clientsAPI.getAll();
+      set({ clients });
+    } catch (error: any) {
+      set({ error: error.message });
+    }
   },
 
   addClient: async (clientData) => {
-    const client = await clientsAPI.create(clientData);
-    set((state) => ({ clients: [client, ...state.clients] }));
-    return client;
+    try {
+      const client = await clientsAPI.create(clientData);
+      set((state) => ({ clients: [client, ...state.clients] }));
+      return client;
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   updateClient: async (id, clientData) => {
-    await clientsAPI.update(id, clientData);
-    set((state) => ({
-      clients: state.clients.map((c) => (c.id === id ? { ...c, ...clientData } : c)),
-    }));
+    try {
+      await clientsAPI.update(id, clientData);
+      set((state) => ({
+        clients: state.clients.map((c) => (c.id === id ? { ...c, ...clientData } : c)),
+      }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   deleteClient: async (id) => {
-    await clientsAPI.delete(id);
-    set((state) => ({ clients: state.clients.filter((c) => c.id !== id) }));
+    try {
+      await clientsAPI.delete(id);
+      set((state) => ({ clients: state.clients.filter((c) => c.id !== id) }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   // Bookings
   fetchBookings: async () => {
-    const bookings = await bookingsAPI.getAll();
-    set({ bookings });
+    try {
+      const bookings = await bookingsAPI.getAll();
+      set({ bookings });
+    } catch (error: any) {
+      set({ error: error.message });
+    }
   },
 
   addBooking: async (bookingData) => {
-    const booking = await bookingsAPI.create(bookingData);
-    set((state) => ({ bookings: [booking, ...state.bookings] }));
-    return booking;
+    try {
+      const booking = await bookingsAPI.create(bookingData);
+      set((state) => ({ bookings: [booking, ...state.bookings] }));
+      return booking;
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   updateBooking: async (id, bookingData) => {
-    await bookingsAPI.update(id, bookingData);
-    set((state) => ({
-      bookings: state.bookings.map((b) => (b.id === id ? { ...b, ...bookingData } : b)),
-    }));
+    try {
+      await bookingsAPI.update(id, bookingData);
+      set((state) => ({
+        bookings: state.bookings.map((b) => (b.id === id ? { ...b, ...bookingData } : b)),
+      }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   deleteBooking: async (id) => {
-    await bookingsAPI.delete(id);
-    set((state) => ({
-      bookings: state.bookings.filter((b) => b.id !== id),
-      payments: state.payments.filter((p) => p.bookingId !== id),
-    }));
+    try {
+      await bookingsAPI.delete(id);
+      set((state) => ({
+        bookings: state.bookings.filter((b) => b.id !== id),
+        payments: state.payments.filter((p) => p.bookingId !== id),
+      }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   getNextWayBillNo: async () => {
-    return await bookingsAPI.getNextWayBillNo();
-  },
-
-  getNextInvoiceNo: async () => {
-    const { bookings } = get();
-    let maxNumber = 1000;
-    
-    bookings.forEach((b) => {
-      if (b.invoiceNo) {
-        const match = b.invoiceNo.match(/^(\d+)/);
-        if (match) {
-          const num = parseInt(match[1], 10);
-          if (!isNaN(num) && num > maxNumber) {
-            maxNumber = num;
-          }
-        }
-      }
-    });
-
-    const today = new Date();
-    const currentYear = today.getFullYear();
-    const currentMonth = today.getMonth() + 1; // 1-12
-    let startYear, endYear;
-    
-    if (currentMonth >= 4) {
-      startYear = currentYear;
-      endYear = currentYear + 1;
-    } else {
-      startYear = currentYear - 1;
-      endYear = currentYear;
+    try {
+      return await bookingsAPI.getNextWayBillNo();
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
     }
-    const fy = `${startYear.toString().slice(-2)}-${endYear.toString().slice(-2)}`;
-
-    return `${maxNumber + 1}/${fy}`;
   },
 
   // Payments
   fetchPayments: async () => {
-    const payments = await paymentsAPI.getAll();
-    set({ payments });
+    try {
+      const payments = await paymentsAPI.getAll();
+      set({ payments });
+    } catch (error: any) {
+      set({ error: error.message });
+    }
   },
 
   addPayment: async (paymentData) => {
-    const payment = await paymentsAPI.create(paymentData);
-    set((state) => ({ payments: [payment, ...state.payments] }));
+    try {
+      const payment = await paymentsAPI.create(paymentData);
+      set((state) => {
+        const newPayments = [payment, ...state.payments];
+        // Update local booking payment status
+        const booking = state.bookings.find((b) => b.id === paymentData.bookingId);
+        if (booking) {
+          const totalPaid = newPayments
+            .filter((p) => p.bookingId === paymentData.bookingId)
+            .reduce((sum, p) => sum + p.amount, 0);
+          const payStatus: PaymentStatus =
+            totalPaid >= booking.totalFreight ? 'paid' : totalPaid > 0 ? 'partial' : 'unpaid';
+          const updatedBookings = state.bookings.map((b) =>
+            b.id === paymentData.bookingId
+              ? { ...b, amountPaid: totalPaid, paymentStatus: payStatus }
+              : b
+          );
+          return { payments: newPayments, bookings: updatedBookings };
+        }
+        return { payments: newPayments };
+      });
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   updatePayment: async (id, paymentData) => {
-    await paymentsAPI.update(id, paymentData);
-    set((state) => ({
-      payments: state.payments.map((p) => (p.id === id ? { ...p, ...paymentData } : p)),
-    }));
+    try {
+      await paymentsAPI.update(id, paymentData);
+      set((state) => ({
+        payments: state.payments.map((p) => (p.id === id ? { ...p, ...paymentData } : p)),
+      }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   deletePayment: async (id) => {
-    await paymentsAPI.delete(id);
-    set((state) => ({ payments: state.payments.filter((p) => p.id !== id) }));
+    try {
+      await paymentsAPI.delete(id);
+      set((state) => ({ payments: state.payments.filter((p) => p.id !== id) }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   // Settings
   fetchSettings: async () => {
-    const settings = await settingsAPI.get();
-    set({ settings });
+    try {
+      const settings = await settingsAPI.get();
+      set({ settings });
+    } catch (error: any) {
+      set({ error: error.message });
+    }
   },
 
   updateSettings: async (settingsData) => {
-    const updatedSettings = await settingsAPI.update(settingsData);
-    set((state) => ({ settings: { ...state.settings, ...updatedSettings } }));
+    try {
+      const updatedSettings = await settingsAPI.update(settingsData);
+      set((state) => ({ settings: { ...state.settings, ...updatedSettings } }));
+    } catch (error: any) {
+      set({ error: error.message });
+      throw error;
+    }
   },
 
   // UI
@@ -333,11 +405,11 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({ sidebarOpen: !state.sidebarOpen }));
   },
 
-  setSidebarOpen: (open: boolean) => {
+  setSidebarOpen: (open) => {
     set({ sidebarOpen: open });
   },
 
-  setError: (error: string | null) => {
+  setError: (error) => {
     set({ error });
   },
 }));
